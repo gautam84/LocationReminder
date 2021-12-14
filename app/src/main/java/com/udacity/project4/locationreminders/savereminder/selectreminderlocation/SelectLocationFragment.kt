@@ -272,45 +272,44 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     @SuppressLint("MissingPermission", "NewApi")
     private fun isLocationSettingsEnabled() {
-        if (isPermissionGranted()) {
-            val locationRequest = LocationRequest.create().apply {
-                priority = LocationRequest.PRIORITY_LOW_POWER
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_LOW_POWER
+        }
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val settingsClient = LocationServices.getSettingsClient(requireActivity())
+        val locationSettingsResponseTask =
+            settingsClient.checkLocationSettings(builder.build())
+        locationSettingsResponseTask.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException) {
+                try {
+                    exception.startResolutionForResult(
+                        requireActivity(),
+                        REQUEST_TURN_DEVICE_LOCATION_ON
+                    )
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    Log.d(
+                        "TAG",
+                        "Error getting location settings resolution: " + sendEx.message
+                    )
+                }
             }
-            val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
-            val settingsClient = LocationServices.getSettingsClient(requireActivity())
-            val locationSettingsResponseTask =
-                settingsClient.checkLocationSettings(builder.build())
-            locationSettingsResponseTask.addOnFailureListener { exception ->
-                if (exception is ResolvableApiException) {
-                    try {
-                        exception.startResolutionForResult(
-                            requireActivity(),
-                            REQUEST_TURN_DEVICE_LOCATION_ON
-                        )
-                    } catch (sendEx: IntentSender.SendIntentException) {
-                        Log.d(
-                            "TAG",
-                            "Error getting location settings resolution: " + sendEx.message
-                        )
-                    }
-                } else {
+        }
+
+        val locationManager =
+            requireActivity().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        if (locationManager.isLocationEnabled) {
+            _viewModel.isLocationEnabled.value = true
+        } else {
+            _viewModel.isLocationEnabled.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
+                if (!it) {
                     Snackbar.make(
-                        requireView(),
+                        binding.mainSelectLocationFragmentView,
                         getString(R.string.please_enable_location),
                         Snackbar.LENGTH_INDEFINITE
                     ).show()
                 }
-            }
-
-            val locationManager =
-                requireActivity().getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-            if (locationManager.isLocationEnabled) {
-                _viewModel.isLocationEnabled.value = true
-
-            }
-
-
+            })
 
         }
     }
