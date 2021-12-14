@@ -6,9 +6,11 @@ import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import com.google.android.material.internal.ContextUtils.getActivity
 import com.udacity.project4.locationreminders.RemindersActivity
 import com.udacity.project4.locationreminders.data.ReminderDataSource
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
@@ -19,6 +21,8 @@ import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.util.DataBindingIdlingResource
 import com.udacity.project4.util.monitorActivity
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.CoreMatchers
+import org.hamcrest.CoreMatchers.not
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -95,7 +99,7 @@ class RemindersActivityTest :
         onView(withId(R.id.reminderTitle)).perform(typeText("New Reminder Title"))
         onView(withId(R.id.reminderDescription)).perform(typeText("New Reminder Description"))
         onView(withId(R.id.selectLocation)).perform(click())
-        onView(withId(R.id.mapView)).perform(longClick())
+        onView(withId(R.id.mapView)).perform(click())
         onView(withId(R.id.saveBtn)).perform(click())
 
         onView(withText("New Reminder Title")).check(matches(isDisplayed()))
@@ -103,10 +107,18 @@ class RemindersActivityTest :
 
         onView(withId(R.id.saveReminder)).perform(click())
 
+        onView(withText(R.string.reminder_saved)).inRoot(withDecorView(not(
+            CoreMatchers.`is`(
+                getActivity(appContext)!!.window.decorView
+            )
+        ))).check(matches(isDisplayed()))
+
         onView(withText("New Reminder Title")).check(matches(isDisplayed()))
         onView(withText("New Reminder Description")).check(matches(isDisplayed()))
 
         activityScenario.close()
     }
+
+
 }
 

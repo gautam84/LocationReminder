@@ -8,9 +8,11 @@ import androidx.test.filters.MediumTest
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.locationreminders.data.dto.Result
 import com.udacity.project4.util.MainCoroutineRule
+import junit.framework.Assert.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runBlockingTest
 import org.hamcrest.CoreMatchers.*
 import org.hamcrest.MatcherAssert.assertThat
 import org.junit.After
@@ -101,6 +103,19 @@ class RemindersLocalRepositoryTest {
         remainderRepository.deleteAllReminders()
         val savedList = remainderRepository.getReminders() as Result.Success<List<ReminderDTO>>
         assertThat(savedList.data.isEmpty(), `is`(true))
+    }
+
+    @Test
+    fun reminderNotFound_isReminderStatusCodeNull_true() = runBlocking {
+        remainderRepository.saveReminder(
+            ReminderDTO(
+                "Test1", "test1", "test1", 0.0, 0.0, "test1"
+            )
+        )
+        val reminder = remainderRepository.getReminder("unknown id") as Result.Error
+        assertNotNull(reminder)
+        assertEquals("Reminder not found!", reminder.message)
+        assertNull(reminder.statusCode)
     }
 
 
