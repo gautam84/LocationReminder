@@ -25,10 +25,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
     @SuppressLint("LongLogTag")
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_GEOFENCE_EVENT) {
-            // Obtain the Geofence event
             val geofencingEvent = GeofencingEvent.fromIntent(intent)
 
-            // Check if there is an error with the Geofence event and log the message
             if (geofencingEvent.hasError()) {
                 val errorMessage = when (geofencingEvent.errorCode) {
                     GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE -> context.getString(R.string.geofence_not_available)
@@ -40,16 +38,13 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                 return
             }
 
-            // If the user has entered the Geofence
             if (geofencingEvent.geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
 
-                // Log that the user has entered the Geofence
                 Log.d("tag", context.getString(R.string.geofence_entered))
 
                 when {
                     geofencingEvent.triggeringGeofences.isNotEmpty() -> {
 
-                        // Log that the triggering Geofence(s) exist and use the IntentService to enqueue the work
                         Log.i(
                             "tag",
                             "Calling intent service to send notification the user has entered the Geofence..."
@@ -58,7 +53,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                     }
                     else -> {
 
-                        // Log that the triggering Geofence(s) were empty and exit the process
                         Log.e("tag", "Triggering Geofences is empty. Exiting...")
                         return
                     }

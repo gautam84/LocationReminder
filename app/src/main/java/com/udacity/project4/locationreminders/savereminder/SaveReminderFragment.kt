@@ -55,6 +55,8 @@ class SaveReminderFragment : BaseFragment() {
 
         binding.viewModel = _viewModel
 
+        geofencingClient = LocationServices.getGeofencingClient(activity!!)
+
         return binding.root
     }
 
@@ -81,24 +83,27 @@ class SaveReminderFragment : BaseFragment() {
                 val reminderDataItem = ReminderDataItem(
                     title,
                     description,
-                    args.name,
-                    args.latLng.latitude,
-                    args.latLng.longitude
+                    _viewModel.selectedPOI.value?.name,
+                    _viewModel.selectedPOI.value?.latLng?.latitude,
+                    _viewModel.selectedPOI.value?.latLng?.longitude
                 )
 
                 _viewModel.validateAndSaveReminder(
                     reminderDataItem
                 )
+
                 if (reminderDataItem != null) {
-                    checkDeviceLocationSettingsAndStartGeofence(reminderDataItem)
+                    val geofence = createGeofence(
+                        reminderDataItem.latitude!!,
+                        reminderDataItem.longitude!!,
+                        reminderDataItem.id
+                    )
+                    val geofencingRequest = createGeofenceRequest(geofence)
+                    addGeofence(geofencingRequest, geofencePendingIntent)
                 }
-                Log.d("tagg", args.latLng.toString())
+                Log.d("tagg", _viewModel.selectedPOI.value.toString())
                 findNavController().navigateUp()
-
-
             }
-
-
         }
     }
 
@@ -108,80 +113,51 @@ class SaveReminderFragment : BaseFragment() {
         _viewModel.onClear()
     }
 
+    private fun createGeofence(latitude: Double, longitude: Double, id: String): Geofence {
+        return Geofence.Builder()
+            .setRequestId(id)
+            .setCircularRegion(latitude, longitude, GEOFENCE_RADIUS_IN_METERS)
+            .setExpirationDuration(GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+            .build()
+    }
 
-    @SuppressLint("MissingPermission")
-    private fun checkDeviceLocationSettingsAndStartGeofence(reminderDataItem: ReminderDataItem) {
-        val locationRequest = LocationRequest.create().apply {
-            priority = LocationRequest.PRIORITY_LOW_POWER
-        }
-        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
-        val settingsClient = LocationServices.getSettingsClient(requireActivity())
-        val locationSettingsResponseTask =
-            settingsClient.checkLocationSettings(builder.build())
-        locationSettingsResponseTask.addOnFailureListener { exception ->
-            if (exception is ResolvableApiException) {
-                try {
-                    exception.startResolutionForResult(
-                        requireActivity(),
-                        REQUEST_TURN_DEVICE_LOCATION_ON
-                    )
-                } catch (sendEx: IntentSender.SendIntentException) {
-                    Log.d("TAG", "Error getting location settings resolution: " + sendEx.message)
-                }
-            } else {
-                Snackbar.make(
-                    binding.saveReminderFragmentMain,
-                    R.string.location_required_error, Snackbar.LENGTH_INDEFINITE
-                ).setAction(android.R.string.ok) {
-                    checkDeviceLocationSettingsAndStartGeofence(reminderDataItem)
-                }.show()
-            }
-        }
-        locationSettingsResponseTask.addOnCompleteListener {
-            if (it.isSuccessful) {
+    private fun createGeofenceRequest(geofence: Geofence): GeofencingRequest {
+        return GeofencingRequest.Builder()
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .addGeofence(geofence)
+            .build()
+    }
 
-                val geofence = Geofence.Builder()
-                    .setRequestId(reminderDataItem.id)
-                    .setCircularRegion(
-                        reminderDataItem.latitude!!,
-                        reminderDataItem.longitude!!,
-                        GEOFENCE_RADIUS_IN_METERS
-                    )
-                    .setExpirationDuration(GEOFENCE_EXPIRATION_IN_MILLISECONDS)
-                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
-                    .build()
 
-                val geofencingRequest = GeofencingRequest.Builder()
-                    .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
-                    .addGeofence(geofence)
-                    .build()
-
+    @SuppressLint("MissingPermission", "LongLogTag")
+    private fun addGeofence(
+        geofencingRequest: GeofencingRequest,
+        geofencePendingIntent: PendingIntent
+    ) {
+        geofencingClient.removeGeofences(geofencePendingIntent)?.run {
+            addOnCompleteListener {
                 geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)?.run {
                     addOnSuccessListener {
-                        Toast.makeText(
-                            requireActivity(), getString(R.string.geofencing_added),
-                            Toast.LENGTH_SHORT
-                        )
-                            .show()
-                        Log.e("Add Geofence", geofence.requestId)
+                        activity?.let {
+                            _viewModel.showToast.value = "Added Geofence!"
+                        }
                     }
                     addOnFailureListener {
-                        Toast.makeText(
-                            requireActivity(), R.string.geofences_not_added,
-                            Toast.LENGTH_SHORT
-                        ).show()
-
+                        activity?.let {
+                            _viewModel.showToast.value = getString(R.string.geofences_not_added)
+                        }
+                        if ((it.message != null)) {
+                            Log.d("Failure encountered adding Geofence: %s", it.message.toString())
+                        }
                     }
                 }
-
-
             }
         }
     }
 
 
     companion object {
-        private const val REQUEST_TURN_DEVICE_LOCATION_ON = 29
         const val GEOFENCE_RADIUS_IN_METERS = 100f
         val GEOFENCE_EXPIRATION_IN_MILLISECONDS: Long = TimeUnit.HOURS.toMillis(1)
     }
