@@ -10,6 +10,7 @@ import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import androidx.test.rule.ActivityTestRule
 import com.google.android.material.internal.ContextUtils.getActivity
 import com.udacity.project4.locationreminders.RemindersActivity
 import com.udacity.project4.locationreminders.data.ReminderDataSource
@@ -24,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import org.hamcrest.CoreMatchers
 import org.hamcrest.CoreMatchers.not
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -81,6 +83,12 @@ class RemindersActivityTest :
         }
     }
 
+    @get:Rule
+    var activityTestRule: ActivityTestRule<RemindersActivity?>? = ActivityTestRule(
+        RemindersActivity::class.java
+    )
+
+    var activity: RemindersActivity? = activityTestRule!!.activity
 
     @Test
     fun addReminderTest() = runBlocking {
@@ -109,7 +117,7 @@ class RemindersActivityTest :
 
         onView(withText(R.string.reminder_saved)).inRoot(withDecorView(not(
             CoreMatchers.`is`(
-                getActivity(appContext)!!.window.decorView
+                activity?.window?.decorView
             )
         ))).check(matches(isDisplayed()))
 
