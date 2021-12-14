@@ -42,4 +42,5 @@
     <string name="error_adding_geofence">Error Happened, Can\'t Add Geofence</string>
     <string name="geofencing_added">GeoFencing Added</string>
     <string name="reminder_detils">Reminder Details:</string>
+    <string name="please_enable_location">Please enable location in your device.</string>
 </resources>

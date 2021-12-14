@@ -2,6 +2,7 @@ package com.udacity.project4.locationreminders.savereminder.selectreminderlocati
 
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,7 @@ import androidx.annotation.RequiresApi
 import androidx.constraintlayout.motion.widget.Debug.getLocation
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.checkSelfPermission
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
@@ -39,6 +41,7 @@ import com.udacity.project4.R
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
 import com.udacity.project4.databinding.FragmentSelectLocationBinding
+import com.udacity.project4.locationreminders.savereminder.SaveReminderFragment
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
 import org.koin.android.ext.android.inject
@@ -221,6 +224,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         mapView.getMapAsync(this)
     }
 
+    @SuppressLint("MissingPermission")
     override fun onMapReady(googleMap: GoogleMap?) {
         map = googleMap!!
 
@@ -228,40 +232,17 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         locationRequest.interval = 12000
         locationRequest.fastestInterval = 10000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+
         setMapStyle(map)
-        checkPermissions()
-
-
-
-
-    }
-
-    fun checkPermissions(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (
-                ContextCompat.checkSelfPermission(
-                    requireActivity(),
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(
-                    requireActivity(),
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(
-                    requireActivity(),
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                //Location Permission already granted
-                fusedLocationProviderClient?.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    Looper.myLooper()
-                )
-                map.isMyLocationEnabled = true
-            } else {
-
-                //Request Location Permission
+        if (isPermissionGranted()) {
+            fusedLocationProviderClient?.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.myLooper()
+            )
+            isLocationSettingsEnabled(map)
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 requestPermissions(
                     arrayOf(
                         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -270,25 +251,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                     ),
                     REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND
                 )
-            }
-        } else {
-            if (ContextCompat.checkSelfPermission(
-                    requireActivity(),
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(
-                    requireActivity(),
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                fusedLocationProviderClient?.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    Looper.myLooper()
-                )
-                map.isMyLocationEnabled = true
             } else {
-                // request location permission
                 requestPermissions(
                     arrayOf(
                         Manifest.permission.ACCESS_FINE_LOCATION,
@@ -298,16 +261,87 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 )
             }
         }
+
+
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    @SuppressLint("MissingPermission")
+    private fun isLocationSettingsEnabled(googleMap: GoogleMap) {
+        if (isPermissionGranted()) {
+            val locationRequest = LocationRequest.create().apply {
+                priority = LocationRequest.PRIORITY_LOW_POWER
+            }
+            val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+            val settingsClient = LocationServices.getSettingsClient(requireActivity())
+            val locationSettingsResponseTask =
+                settingsClient.checkLocationSettings(builder.build())
+            locationSettingsResponseTask.addOnFailureListener { exception ->
+                if (exception is ResolvableApiException) {
+                    try {
+                        exception.startResolutionForResult(
+                            requireActivity(),
+                            REQUEST_TURN_DEVICE_LOCATION_ON
+                        )
+                    } catch (sendEx: IntentSender.SendIntentException) {
+                        Log.d(
+                            "TAG",
+                            "Error getting location settings resolution: " + sendEx.message
+                        )
+                    }
+                } else {
+                    Snackbar.make(
+                        requireView(),
+                        getString(R.string.please_enable_location),
+                        Snackbar.LENGTH_INDEFINITE
+                    )
+                }
+            }
+            locationSettingsResponseTask.addOnSuccessListener {
+                googleMap.isMyLocationEnabled = true
+            }
+
+
+        }
+    }
+
+    private fun isPermissionGranted(): Boolean {
+        val foregroundLocationApproved = (
+                PackageManager.PERMISSION_GRANTED ==
+                        ActivityCompat.checkSelfPermission(
+                            requireActivity(),
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ))
+        val backgroundPermissionApproved =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                PackageManager.PERMISSION_GRANTED ==
+                        ActivityCompat.checkSelfPermission(
+                            requireActivity(), Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        )
+            } else {
+                true
+            }
+        return foregroundLocationApproved && backgroundPermissionApproved
+    }
+
+
+    @SuppressLint("MissingPermission")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (grantResults.isEmpty() || grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED ||
             (requestCode == REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND &&
-                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)) {
+                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
+        ) {
 
-            Snackbar.make(requireView(), R.string.permission_denied_explanation, Snackbar.LENGTH_LONG)
+            Snackbar.make(
+                requireView(),
+                R.string.permission_denied_explanation,
+                Snackbar.LENGTH_INDEFINITE
+            )
                 .setAction(R.string.settings) {
 
                     startActivity(Intent().apply {
@@ -317,8 +351,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                     })
                 }.show()
         } else {
-            checkPermissions()
-
+            isLocationSettingsEnabled(map)
         }
     }
 
@@ -328,10 +361,10 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         private const val REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND = 21
         private const val LOCATION_PERMISSION_INDEX = 0
         private const val BACKGROUND_LOCATION_PERMISSION_INDEX = 1
+        private const val REQUEST_TURN_DEVICE_LOCATION_ON = 22
 
 
     }
-
 
 
 }
