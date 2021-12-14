@@ -234,8 +234,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         locationRequest.fastestInterval = 10000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
 
+
         setMapStyle(map)
         if (isPermissionGranted()) {
+            isLocationSettingsEnabled()
+
             fusedLocationProviderClient?.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
@@ -245,7 +248,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 map.isMyLocationEnabled = it
             })
 
-            isLocationSettingsEnabled()
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 requestPermissions(
@@ -292,7 +294,14 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                         "Error getting location settings resolution: " + sendEx.message
                     )
                 }
+            } else{
+                Snackbar.make(
+                    binding.mainSelectLocationFragmentView,
+                    getString(R.string.please_enable_location),
+                    Snackbar.LENGTH_LONG
+                ).show()
             }
+
         }
 
         val locationManager =
@@ -300,17 +309,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
         if (locationManager.isLocationEnabled) {
             _viewModel.isLocationEnabled.value = true
-        } else {
-            _viewModel.isLocationEnabled.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
-                if (!it) {
-                    Snackbar.make(
-                        binding.mainSelectLocationFragmentView,
-                        getString(R.string.please_enable_location),
-                        Snackbar.LENGTH_INDEFINITE
-                    ).show()
-                }
-            })
-
         }
     }
 
