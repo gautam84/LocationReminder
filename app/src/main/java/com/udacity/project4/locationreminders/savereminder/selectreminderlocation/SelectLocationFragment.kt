@@ -9,9 +9,11 @@ import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.location.Location
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.*
 import androidx.annotation.RequiresApi
@@ -32,6 +34,7 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.google.android.gms.tasks.Task
 import com.google.android.material.snackbar.Snackbar
+import com.udacity.project4.BuildConfig
 import com.udacity.project4.R
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
@@ -78,8 +81,16 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     }
 
     private fun setMapLongClick(googleMap: GoogleMap) {
-        googleMap.setOnMapLongClickListener { latLng ->
+        googleMap.setOnMapClickListener { latLng ->
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 11f))
+            mapMarker?.remove()
+
             addMapMarker(latLng)
+
+            _viewModel.latitude.value = latLng.latitude
+            _viewModel.longitude.value = latLng.longitude
+            _viewModel.reminderSelectedLocationStr.value = getLocationSnippet(latLng)
+
         }
     }
 
@@ -89,14 +100,22 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         // Remove any previous map Marker
         mapMarker?.remove()
 
-        mapMarker = this.map.addMarker(MarkerOptions().position(latLng).title(getString(R.string.dropped_pin)).snippet(getLocationSnippet(latLng)))
+        mapMarker = this.map.addMarker(
+            MarkerOptions().position(latLng).title(getString(R.string.dropped_pin))
+                .snippet(getLocationSnippet(latLng))
+        )
         mapMarker?.showInfoWindow()
 
 
     }
 
     private fun getLocationSnippet(latLng: LatLng): String {
-        return String.format(Locale.getDefault(), getString(R.string.lat_long_snippet), latLng.latitude, latLng.longitude)
+        return String.format(
+            Locale.getDefault(),
+            getString(R.string.lat_long_snippet),
+            latLng.latitude,
+            latLng.longitude
+        )
     }
 
     fun onPoiSelected(googleMap: GoogleMap) {
@@ -111,7 +130,9 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             mapMarker?.showInfoWindow()
 
 
-            _viewModel.selectedPOI.value = poi
+            _viewModel.latitude.value = poi.latLng.latitude
+            _viewModel.longitude.value = poi.latLng.longitude
+            _viewModel.reminderSelectedLocationStr.value = poi.name
 
         }
     }
@@ -164,9 +185,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     private fun onLocationSelected() {
         findNavController().navigate(
-            SelectLocationFragmentDirections.actionSelectLocationFragmentToSaveReminderFragment(
-                _viewModel.selectedPOI.value
-            )
+            SelectLocationFragmentDirections.actionSelectLocationFragmentToSaveReminderFragment()
         )
     }
 
@@ -210,8 +229,15 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         locationRequest.fastestInterval = 10000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         setMapStyle(map)
+        checkPermissions()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+
+
+    }
+
+    fun checkPermissions(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (
                 ContextCompat.checkSelfPermission(
                     requireActivity(),
@@ -220,6 +246,10 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 ContextCompat.checkSelfPermission(
                     requireActivity(),
                     Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(
+                    requireActivity(),
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
                 //Location Permission already granted
@@ -230,23 +260,78 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 )
                 map.isMyLocationEnabled = true
             } else {
+
                 //Request Location Permission
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                    ),
+                    REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND
+                )
             }
         } else {
-            fusedLocationProviderClient?.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.myLooper()
-            )
-            map.isMyLocationEnabled = true
+            if (ContextCompat.checkSelfPermission(
+                    requireActivity(),
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(
+                    requireActivity(),
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                fusedLocationProviderClient?.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    Looper.myLooper()
+                )
+                map.isMyLocationEnabled = true
+            } else {
+                // request location permission
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    ),
+                    REQUEST_LOCATION_PERMISSION_FOREGROUND
+                )
+            }
         }
+    }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (grantResults.isEmpty() || grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED ||
+            (requestCode == REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND &&
+                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)) {
+
+            Snackbar.make(requireView(), R.string.permission_denied_explanation, Snackbar.LENGTH_LONG)
+                .setAction(R.string.settings) {
+
+                    startActivity(Intent().apply {
+                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                        data = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                }.show()
+        } else {
+            checkPermissions()
+
+        }
     }
 
 
     companion object {
-        private const val REQUEST_LOCATION_PERMISSION = 0
+        private const val REQUEST_LOCATION_PERMISSION_FOREGROUND = 22
+        private const val REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND = 21
+        private const val LOCATION_PERMISSION_INDEX = 0
+        private const val BACKGROUND_LOCATION_PERMISSION_INDEX = 1
+
+
     }
+
 
 
 }

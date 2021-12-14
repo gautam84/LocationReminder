@@ -76,34 +76,34 @@ class SaveReminderFragment : BaseFragment() {
             val latitude = _viewModel.latitude.value
             val longitude = _viewModel.longitude.value
 
-            val args =
-                SaveReminderFragmentArgs.fromBundle(requireArguments()).poi
+            val reminderDataItem = ReminderDataItem(
+                title,
+                description,
+                location,
+                latitude,
+                longitude
+            )
 
-            if (args != null) {
-                val reminderDataItem = ReminderDataItem(
-                    title,
-                    description,
-                    _viewModel.selectedPOI.value?.name,
-                    _viewModel.selectedPOI.value?.latLng?.latitude,
-                    _viewModel.selectedPOI.value?.latLng?.longitude
+            if (reminderDataItem.latitude != null ||
+                reminderDataItem.longitude != null ||
+                reminderDataItem.location != null
+            ) {
+                val geofence = createGeofence(
+                    reminderDataItem.latitude!!,
+                    reminderDataItem.longitude!!,
+                    reminderDataItem.id
                 )
+                val geofencingRequest = createGeofenceRequest(geofence)
+                addGeofence(geofencingRequest, geofencePendingIntent)
 
                 _viewModel.validateAndSaveReminder(
                     reminderDataItem
                 )
-
-                if (reminderDataItem != null) {
-                    val geofence = createGeofence(
-                        reminderDataItem.latitude!!,
-                        reminderDataItem.longitude!!,
-                        reminderDataItem.id
-                    )
-                    val geofencingRequest = createGeofenceRequest(geofence)
-                    addGeofence(geofencingRequest, geofencePendingIntent)
-                }
-                Log.d("tagg", _viewModel.selectedPOI.value.toString())
                 findNavController().navigateUp()
+
             }
+            Log.d("tagg", _viewModel.selectedPOI.value.toString())
+
         }
     }
 
@@ -117,7 +117,7 @@ class SaveReminderFragment : BaseFragment() {
         return Geofence.Builder()
             .setRequestId(id)
             .setCircularRegion(latitude, longitude, GEOFENCE_RADIUS_IN_METERS)
-            .setExpirationDuration(GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
             .build()
     }
@@ -135,22 +135,18 @@ class SaveReminderFragment : BaseFragment() {
         geofencingRequest: GeofencingRequest,
         geofencePendingIntent: PendingIntent
     ) {
-        geofencingClient.removeGeofences(geofencePendingIntent)?.run {
-            addOnCompleteListener {
-                geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)?.run {
-                    addOnSuccessListener {
-                        activity?.let {
-                            _viewModel.showToast.value = "Added Geofence!"
-                        }
-                    }
-                    addOnFailureListener {
-                        activity?.let {
-                            _viewModel.showToast.value = getString(R.string.geofences_not_added)
-                        }
-                        if ((it.message != null)) {
-                            Log.d("Failure encountered adding Geofence: %s", it.message.toString())
-                        }
-                    }
+        geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)?.run {
+            addOnSuccessListener {
+                activity?.let {
+                    _viewModel.showToast.value = "Added Geofence!"
+                }
+            }
+            addOnFailureListener {
+                activity?.let {
+                    _viewModel.showToast.value = getString(R.string.geofences_not_added)
+                }
+                if ((it.message != null)) {
+                    Log.d("Failure encountered adding Geofence: %s", it.message.toString())
                 }
             }
         }
@@ -159,7 +155,6 @@ class SaveReminderFragment : BaseFragment() {
 
     companion object {
         const val GEOFENCE_RADIUS_IN_METERS = 100f
-        val GEOFENCE_EXPIRATION_IN_MILLISECONDS: Long = TimeUnit.HOURS.toMillis(1)
     }
 }
 
