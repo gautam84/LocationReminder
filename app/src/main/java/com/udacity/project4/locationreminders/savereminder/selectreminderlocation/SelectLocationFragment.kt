@@ -10,6 +10,7 @@ import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.location.Location
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -240,7 +241,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 locationCallback,
                 Looper.myLooper()
             )
-            isLocationSettingsEnabled(map)
+            _viewModel.isLocationEnabled.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
+                map.isMyLocationEnabled = it
+            })
+
+            isLocationSettingsEnabled()
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 requestPermissions(
@@ -265,8 +270,8 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     }
 
-    @SuppressLint("MissingPermission")
-    private fun isLocationSettingsEnabled(googleMap: GoogleMap) {
+    @SuppressLint("MissingPermission", "NewApi")
+    private fun isLocationSettingsEnabled() {
         if (isPermissionGranted()) {
             val locationRequest = LocationRequest.create().apply {
                 priority = LocationRequest.PRIORITY_LOW_POWER
@@ -293,12 +298,18 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                         requireView(),
                         getString(R.string.please_enable_location),
                         Snackbar.LENGTH_INDEFINITE
-                    )
+                    ).show()
                 }
             }
-            locationSettingsResponseTask.addOnSuccessListener {
-                googleMap.isMyLocationEnabled = true
+
+            val locationManager =
+                requireActivity().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+            if (locationManager.isLocationEnabled) {
+                _viewModel.isLocationEnabled.value = true
+
             }
+
 
 
         }
@@ -351,7 +362,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                     })
                 }.show()
         } else {
-            isLocationSettingsEnabled(map)
+            isLocationSettingsEnabled()
         }
     }
 

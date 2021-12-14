@@ -90,8 +90,8 @@ class SaveReminderFragment : BaseFragment() {
                 longitude
             )
 
-            if (reminderDataItem.latitude != null ||
-                reminderDataItem.longitude != null ||
+            if (reminderDataItem.latitude != null &&
+                reminderDataItem.longitude != null &&
                 reminderDataItem.location != null
             ) {
                 val geofence = createGeofence(
@@ -224,7 +224,6 @@ class SaveReminderFragment : BaseFragment() {
         geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)?.run {
             addOnSuccessListener {
                 activity?.let {
-//                    _viewModel.showToast.value = "Added Geofence!"
                     Log.d("tag", "Added Geofence!")
 
                 }
