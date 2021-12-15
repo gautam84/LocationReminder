@@ -271,6 +271,10 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         locationRequest.fastestInterval = 10000
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
 
+        _viewModel.isLocationEnabled.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
+            map.isMyLocationEnabled = it
+        })
+
 
         setMapStyle(map)
         if (isPermissionGranted()) {
@@ -281,9 +285,9 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 locationCallback,
                 Looper.myLooper()
             )
-            _viewModel.isLocationEnabled.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
-                map.isMyLocationEnabled = it
-            })
+            map.isMyLocationEnabled = true
+
+
 
         } else {
             requestPermissions(
