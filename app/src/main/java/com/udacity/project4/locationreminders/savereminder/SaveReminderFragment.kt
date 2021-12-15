@@ -86,7 +86,7 @@ class SaveReminderFragment : BaseFragment() {
     }
 
     @SuppressLint("NewApi")
-    fun checkDeviceLocationSettingsAndStartGeofence(){
+    fun checkDeviceLocationSettingsAndStartGeofence(resolve:Boolean = true){
         val title = _viewModel.reminderTitle.value
         val description = _viewModel.reminderDescription.value
         val location = _viewModel.reminderSelectedLocationStr.value
@@ -130,7 +130,7 @@ class SaveReminderFragment : BaseFragment() {
                     val locationSettingsResponseTask =
                         settingsClient.checkLocationSettings(builder.build())
                     locationSettingsResponseTask.addOnFailureListener { exception ->
-                        if (exception is ResolvableApiException) {
+                        if (exception is ResolvableApiException && resolve) {
                             try {
                                 startIntentSenderForResult(
                                     exception.resolution.intentSender,
@@ -167,7 +167,7 @@ class SaveReminderFragment : BaseFragment() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_TURN_DEVICE_LOCATION_ON) {
-            checkDeviceLocationSettingsAndStartGeofence()
+            checkDeviceLocationSettingsAndStartGeofence(false)
         }
     }
 

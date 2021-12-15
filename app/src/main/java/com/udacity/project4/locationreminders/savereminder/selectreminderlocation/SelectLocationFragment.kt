@@ -76,8 +76,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
                 val latLng = LatLng(location.latitude, location.longitude)
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 11.0f))
-                onPoiSelected(map)
-                setMapLongClick(map)
 
 
             }
@@ -94,6 +92,39 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             _viewModel.latitude.value = latLng.latitude
             _viewModel.longitude.value = latLng.longitude
             _viewModel.reminderSelectedLocationStr.value = getLocationSnippet(latLng)
+
+        }
+    }
+
+
+    @SuppressLint("MissingPermission")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (grantResults.isEmpty() || grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED ||
+            (requestCode == REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND &&
+                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
+        ) {
+
+            Snackbar.make(
+                requireView(),
+                R.string.permission_denied_explanation,
+                Snackbar.LENGTH_INDEFINITE
+            )
+                .setAction(R.string.settings) {
+
+                    startActivity(Intent().apply {
+                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                        data = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                }.show()
+        } else {
+            _viewModel.isLocationEnabled.value = true
 
         }
     }
@@ -225,9 +256,15 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         mapView.getMapAsync(this)
     }
 
+
+
+
     @SuppressLint("MissingPermission")
     override fun onMapReady(googleMap: GoogleMap?) {
         map = googleMap!!
+
+        onPoiSelected(map)
+        setMapLongClick(map)
 
         locationRequest = LocationRequest()
         locationRequest.interval = 12000
@@ -249,27 +286,14 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             })
 
         } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                requestPermissions(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                    ),
-                    REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND
-                )
-            } else {
-                requestPermissions(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ),
-                    REQUEST_LOCATION_PERMISSION_FOREGROUND
-                )
-            }
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                REQUEST_LOCATION_PERMISSION_FOREGROUND
+            )
         }
-
-
     }
 
     @SuppressLint("MissingPermission", "NewApi")
@@ -294,7 +318,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                         "Error getting location settings resolution: " + sendEx.message
                     )
                 }
-            } else{
+            } else {
                 Snackbar.make(
                     binding.mainSelectLocationFragmentView,
                     getString(R.string.please_enable_location),
@@ -303,13 +327,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             }
 
         }
-
-        val locationManager =
-            requireActivity().getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-        if (locationManager.isLocationEnabled) {
+        locationSettingsResponseTask.addOnSuccessListener {
             _viewModel.isLocationEnabled.value = true
         }
+
+
     }
 
     private fun isPermissionGranted(): Boolean {
@@ -332,36 +354,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     }
 
 
-    @SuppressLint("MissingPermission")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (grantResults.isEmpty() || grantResults[LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED ||
-            (requestCode == REQUEST_LOCATION_PERMISSION_FOREGROUND_AND_BACKGROUND &&
-                    grantResults[BACKGROUND_LOCATION_PERMISSION_INDEX] == PackageManager.PERMISSION_DENIED)
-        ) {
-
-            Snackbar.make(
-                requireView(),
-                R.string.permission_denied_explanation,
-                Snackbar.LENGTH_INDEFINITE
-            )
-                .setAction(R.string.settings) {
-
-                    startActivity(Intent().apply {
-                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                        data = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null)
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    })
-                }.show()
-        } else {
-            isLocationSettingsEnabled()
-        }
-    }
 
 
     companion object {
